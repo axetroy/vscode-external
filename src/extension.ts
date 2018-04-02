@@ -21,6 +21,7 @@ interface ICommand {
 
 const NAMESPACE: string = "external";
 const COMMANDS_FIELD: string = "commands";
+const SHOW_TERMINAL_FIELD: string = "showTerminal";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -32,6 +33,8 @@ export function activate(context: ExtensionContext) {
   statusBar.tooltip = "Run External Tools";
   statusBar.text = "External";
   statusBar.show();
+
+  let terminal: vscode.Terminal | void;
 
   context.subscriptions.push(statusBar);
 
@@ -128,16 +131,20 @@ export function activate(context: ExtensionContext) {
         return;
       }
 
-      const terminal = window.createTerminal({
-        name: "external",
-        cwd: projectDir
-      });
+      if (!terminal) {
+        terminal = window.createTerminal({
+          name: "external",
+          cwd: projectDir
+        });
+      }
 
-      terminal.show();
+      if (config.get<boolean>(SHOW_TERMINAL_FIELD)) {
+        terminal.show();
+      }
 
       const commandRaw = command.command
-        .replace(/\$ProjectFileDir\$/, projectDir)
-        .replace(/\$FilePath\$/, filePath || "");
+        .replace(/\$ProjectFileDir\$/, path.normalize(projectDir))
+        .replace(/\$FilePath\$/, filePath ? path.normalize(filePath) : "");
 
       terminal.sendText(commandRaw);
     })

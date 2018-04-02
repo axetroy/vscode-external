@@ -42,6 +42,11 @@
     "configuration": {
       "title": "External",
       "properties": {
+        "external.showTerminal": {
+          "description": "Show terminal when execute the external tool.",
+          "type": "boolean",
+          "default": true
+        },
         "external.commands": {
           "description": "The command you have defined",
           "type": "array",
