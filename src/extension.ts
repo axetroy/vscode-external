@@ -1,4 +1,7 @@
 "use strict";
+
+import * as path from "path";
+
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import {
@@ -110,18 +113,33 @@ export function activate(context: ExtensionContext) {
         return;
       }
 
-      if (!workspace.rootPath) {
+      let projectDir: string | void = workspace.rootPath;
+      let filePath: string | void;
+
+      if (window.activeTextEditor) {
+        filePath = window.activeTextEditor.document.fileName;
+      }
+
+      if (!projectDir && filePath) {
+        projectDir = path.dirname(filePath);
+      }
+
+      if (!projectDir) {
         return;
       }
 
       const terminal = window.createTerminal({
         name: "external",
-        cwd: workspace.rootPath
+        cwd: projectDir
       });
 
       terminal.show();
 
-      terminal.sendText(command.command);
+      const commandRaw = command.command
+        .replace(/\$ProjectFileDir\$/, projectDir)
+        .replace(/\$FilePath\$/, filePath || "");
+
+      terminal.sendText(commandRaw);
     })
   );
 
