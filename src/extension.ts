@@ -4,43 +4,48 @@ import * as path from "path";
 
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import {
-  commands,
-  window,
-  workspace,
-  ExtensionContext,
-  StatusBarAlignment
-} from "vscode";
 
 import * as vscode from "vscode";
+const { commands, window, workspace, StatusBarAlignment } = vscode;
 
 interface ICommand {
   name: string;
   command: string;
+  cwd?: string;
 }
 
 const NAMESPACE: string = "external";
 const COMMANDS_FIELD: string = "commands";
 const SHOW_TERMINAL_FIELD: string = "showTerminal";
 
+function normalizePath(
+  str: string,
+  scope: { projectDir: string; filePath?: string }
+): string {
+  const { projectDir, filePath } = scope;
+  return str
+    .replace(/\$ProjectFileDir\$/, path.normalize(projectDir))
+    .replace(/\$FilePath\$/, filePath ? path.normalize(filePath) : "");
+}
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
-export function activate(context: ExtensionContext) {
+export function activate(context: vscode.ExtensionContext) {
   // status bar
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right);
 
   statusBar.command = "external.run";
   statusBar.tooltip = "Run External Tools";
-  statusBar.text = "External";
+  statusBar.text = "$(zap)External";
   statusBar.show();
 
   let terminal: vscode.Terminal | void;
 
   context.subscriptions.push(statusBar);
 
-  // define external tool
+  // add external tool
   context.subscriptions.push(
-    commands.registerCommand("external.define", async () => {
+    commands.registerCommand("external.add", async () => {
       const name = (await window.showInputBox({
         placeHolder: "Give a Name of This External Tool"
       })) as string;
@@ -58,22 +63,56 @@ export function activate(context: ExtensionContext) {
       }
 
       const config = workspace.getConfiguration(NAMESPACE);
-      const commands: ICommand[] = config.get<ICommand[]>(COMMANDS_FIELD) || [];
+      const externalCommands: ICommand[] =
+        config.get<ICommand[]>(COMMANDS_FIELD) || [];
 
-      const index = commands.findIndex(c => c.name === name);
+      const index = externalCommands.findIndex(c => c.name === name);
 
       if (index >= 0) {
         // replace old command
-        commands[index].command = command;
+        externalCommands[index].command = command;
       } else {
-        commands.push({
+        externalCommands.push({
           name,
-          command
+          command,
+          cwd: "$ProjectFileDir$"
         });
       }
 
       // update config
-      config.update(COMMANDS_FIELD, commands, 1);
+      config.update(COMMANDS_FIELD, externalCommands, 1);
+    })
+  );
+
+  // remove external tool
+  context.subscriptions.push(
+    commands.registerCommand("external.remove", async () => {
+      const config = workspace.getConfiguration(NAMESPACE);
+      const externalCommands: ICommand[] =
+        config.get<ICommand[]>(COMMANDS_FIELD) || [];
+
+      const selected = await window.showQuickPick(
+        externalCommands.map(c => {
+          return {
+            label: c.name,
+            description: c.command
+          };
+        })
+      );
+
+      if (!selected) {
+        return;
+      }
+
+      const index: number = externalCommands.findIndex(
+        c => c.name === selected.label
+      );
+
+      // remove command
+      externalCommands.splice(index, 1);
+
+      // update config
+      config.update(COMMANDS_FIELD, externalCommands, 1);
     })
   );
 
@@ -81,9 +120,10 @@ export function activate(context: ExtensionContext) {
   context.subscriptions.push(
     commands.registerCommand("external.run", async () => {
       const config = workspace.getConfiguration(NAMESPACE);
-      const commands: ICommand[] = config.get<ICommand[]>(COMMANDS_FIELD) || [];
+      const externalCommands: ICommand[] =
+        config.get<ICommand[]>(COMMANDS_FIELD) || [];
 
-      if (!commands || !commands.length) {
+      if (!externalCommands || !externalCommands.length) {
         const action = await window.showInformationMessage(
           "Do Found Any External Tools.",
           "Define",
@@ -98,7 +138,7 @@ export function activate(context: ExtensionContext) {
       }
 
       const selected = await window.showQuickPick(
-        commands.map(c => {
+        externalCommands.map(c => {
           return {
             label: c.name,
             description: c.command
@@ -110,7 +150,7 @@ export function activate(context: ExtensionContext) {
         return;
       }
 
-      const command = commands.find(c => c.name === selected.label);
+      const command = externalCommands.find(c => c.name === selected.label);
 
       if (!command) {
         return;
@@ -136,28 +176,35 @@ export function activate(context: ExtensionContext) {
           name: "external",
           cwd: projectDir
         });
+        context.subscriptions.push(terminal);
       }
 
       if (config.get<boolean>(SHOW_TERMINAL_FIELD)) {
         terminal.show();
       }
 
-      const commandRaw = command.command
-        .replace(/\$ProjectFileDir\$/, path.normalize(projectDir))
-        .replace(/\$FilePath\$/, filePath ? path.normalize(filePath) : "");
+      const scope = {
+        projectDir: path.normalize(projectDir),
+        filePath: filePath ? path.normalize(filePath) : ""
+      };
 
-      terminal.sendText(commandRaw);
+      if (!!command.cwd && command.cwd !== projectDir) {
+        terminal.sendText(`cd ${normalizePath(command.cwd, scope)}`);
+      }
+
+      terminal.sendText(normalizePath(command.command, scope));
     })
   );
 
-  // remove external tool
+  // update external tool
   context.subscriptions.push(
-    commands.registerCommand("external.remove", async () => {
+    commands.registerCommand("external.update", async () => {
       const config = workspace.getConfiguration(NAMESPACE);
-      const commands: ICommand[] = config.get<ICommand[]>(COMMANDS_FIELD) || [];
+      const externalCommands: ICommand[] =
+        config.get<ICommand[]>(COMMANDS_FIELD) || [];
 
       const selected = await window.showQuickPick(
-        commands.map(c => {
+        externalCommands.map(c => {
           return {
             label: c.name,
             description: c.command
@@ -169,18 +216,43 @@ export function activate(context: ExtensionContext) {
         return;
       }
 
-      const index = commands.findIndex(c => c.name === selected.label);
+      const targetCommand = externalCommands.find(
+        c => c.name === selected.label
+      );
 
-      // remove command
-      commands.splice(index, 1);
+      if (!targetCommand) {
+        return;
+      }
+
+      const newName: string | void = await window.showInputBox({
+        value: targetCommand.name,
+        prompt: "Enter The Name of Command"
+      });
+
+      if (!newName) {
+        return;
+      }
+
+      targetCommand.name = newName;
+
+      const newCommand: string | void = await window.showInputBox({
+        value: targetCommand.command,
+        prompt: "Enter The Raw of Command"
+      });
+
+      if (!newCommand) {
+        return;
+      }
+
+      targetCommand.command = newCommand;
 
       // update config
-      config.update(COMMANDS_FIELD, commands, 1);
+      config.update(COMMANDS_FIELD, externalCommands, 1);
     })
   );
 }
 
 // this method is called when your extension is deactivated
-export function deactivate(context: ExtensionContext) {
+export function deactivate(context: vscode.ExtensionContext) {
   //
 }

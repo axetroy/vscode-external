@@ -24,18 +24,23 @@
   "contributes": {
     "commands": [
       {
-        "command": "external.define",
-        "title": "Define External Tool",
-        "category": "External"
-      },
-      {
-        "command": "external.run",
-        "title": "Run External Tool",
+        "command": "external.add",
+        "title": "Add External Tool",
         "category": "External"
       },
       {
         "command": "external.remove",
         "title": "Remove External Tool",
+        "category": "External"
+      },
+      {
+        "command": "external.update",
+        "title": "Update External Tool",
+        "category": "External"
+      },
+      {
+        "command": "external.run",
+        "title": "Run External Tool",
         "category": "External"
       }
     ],

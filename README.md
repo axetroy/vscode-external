@@ -2,9 +2,32 @@
 
 An extension to Run External Tools.
 
+## Feature
+
+- [x] Add External Tools
+- [x] Remove External Tools
+- [x] Run External Tools
+
 ## [CHANGELOG](https://github.com/axetroy/vscode-external/blob/master/CHANGELOG.md)
 
-## Screenshot
+## Useful external tools
+
+```json
+    "external.commands": [
+      {
+        "name": "Prettify",
+        "command": "prettier --write $FilePath$"
+      },
+      {
+        "name": "Format",
+        "command": "prettier --write './**/*.{js,css,json,md}'"
+      },
+      {
+        "name": "Changelog",
+        "command": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0"
+      }
+    ],
+```
 
 ## Contributors
 
