@@ -1,5 +1,7 @@
 # vscode-external
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/axetroy/vscode-external.svg)](https://greenkeeper.io/)
+
 An extension to Run External Tools.
 
 ## Feature
